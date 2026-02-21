@@ -1,5 +1,6 @@
 import taichi as ti
-import math
+import numpy as np
+
 
 ti.init(arch=ti.cpu)
 
@@ -23,7 +24,7 @@ f=ti.Vector.field(2,ti.f32,shape=n)
 k=ti.field(ti.f32,shape=E)
 
 is_dbc=ti.field(ti.i32,shape=n)
-gravity=ti.Vector([0.0,-9.81],ti.f32)
+gravity=ti.Vector([0.0,-9.8],ti.f32)
 
 x_tilde=ti.Vector.field(2,ti.f32,shape=n)
 grad=ti.Vector.field(2,ti.f32,shape=n)
@@ -31,8 +32,6 @@ E_scalar=ti.field(ti.f32,shape=())
 
 max_triplets = 2 * n+16*E   # 先只装 inertia：每个点 2 个对角项，然后16E
 A_builder = ti.linalg.SparseMatrixBuilder(2 * n, 2 * n, max_num_triplets=max_triplets)
-
-
 
 
 @ti.kernel
@@ -101,22 +100,22 @@ def x_tilde_val(h:ti.f32):
         x_tilde[i]=x[i]+h*v[i]
         
 @ti.kernel
-def inertia_val():
+def inertia_val(h:ti.f32):
     for i in range (n):
         diff=x[i]-x_tilde[i]
-        ti.atomic_add(E_scalar[None],0.5*m[i]*diff.dot(diff))
+        ti.atomic_add(E_scalar[None],0.5*m[i]/(h*h)*diff.dot(diff))
 
 @ti.kernel
-def inertia_gradient():
+def inertia_gradient(h:ti.f32):
     for i in range (n):
-        grad[i]+=m[i]*(x[i]-x_tilde[i])
+        grad[i]+=m[i]/(h*h)*(x[i]-x_tilde[i])
 
 @ti.kernel
-def inertia_hessian(A: ti.types.sparse_matrix_builder()):
+def inertia_hessian(A: ti.types.sparse_matrix_builder(),h:ti.f32):
     for i in range (n):
         for r in ti.static(range(2)):
             dof=2*i+r
-            A[dof,dof]+=m[i]
+            A[dof,dof]+=m[i]/(h*h)
 
 
 @ti.kernel
@@ -172,57 +171,138 @@ def mass_spring_hess(A: ti.types.sparse_matrix_builder()):
                 A[dof_j_r, dof_i_c] += -val
                 A[dof_j_r, dof_j_c] += val
                 
-        
-        
-        
+#now, we build the solver                
+def build_hessian(h):
+    A_builder = ti.linalg.SparseMatrixBuilder(
+        2*n, 2*n,
+        max_num_triplets=max_triplets
+    )
+    inertia_hessian(A_builder,h)
+    mass_spring_hess(A_builder)
+    A=A_builder.build()
+    return A
 
+def compute_grad_and_energy(h):
+    clear_grad_energy()
+    inertia_val(h)
+    inertia_gradient(h)
+    gravity_val()
+    gravity_grad()
+    mass_spring_val()
+    mass_spring_grad()
 
-@ti.kernel
-def compute_force():
-    for i in range (n):
-        f[i]=ti.Vector([0.0,0.0])
-    for e in range (E):
-        i=edges[e][0]
-        j=edges[e][1]
-        diff=x[i]-x[j]
-        s=diff.dot(diff)/l2[e]-1
-        f_spring=2*k[e]*s*diff
-        ti.atomic_add(f[i],-f_spring)
-        ti.atomic_add(f[j],f_spring)
-    #for i in range(n):
-        #f[i]+=ti.Vector([0.0,-9.8])*m[i]
-
-    
-@ti.kernel
-def explicit_step(h:ti.f32):
+def build_gradient():
+    b=np.zeros(2*n,dtype=np.float32)
+    g=grad.to_numpy()
     for i in range(n):
-        v[i]+=h*f[i]/m[i]
-        v[i]*=0.999
-        x[i]+=h*v[i]
+        b[2*i]=-g[i,0]
+        b[2*i+1]=-g[i,1]
+    return b
+
+def solve_system(A,b):
+    solver=ti.linalg.SparseSolver(solver_type="LDLT")
+    solver.analyze_pattern(A)
+    solver.factorize(A)
+    dir=solver.solve(b)
+    success=solver.info()
+    if not success:
+        print("The solver failed")
+    return dir
+
+def apply_dir(dir):
+    dir=dir.reshape(n,2)
+    x_np=x.to_numpy()
+    x_np+=dir
+    x.from_numpy(x_np)
+        
+def compute_energy(h):
+    clear_grad_energy()
+    inertia_val(h)
+    gravity_val()
+    mass_spring_val()
+    return E_scalar[None]
+
+def line_search(dir,h,g0_flat):
+    alpha=1.0
+    c=1e-4
+    
+    E0=compute_energy(h)
+    dir_flat=dir.reshape(2*n)
+    descent=np.dot(g0_flat,dir_flat)
+    if descent >= 0:
+        print("Not a descent direction")
+        return 0.0
+    x_backup=x.to_numpy()
+    
+    #until it really decreases
+    while alpha>1e-6:
+        trail=x_backup+alpha*dir.reshape(n,2)
+        x.from_numpy(trail)
+        
+        E_new=compute_energy(h)
+        if(E_new<=E0+c*alpha*descent):
+            x.from_numpy(x_backup)
+            return alpha
+        alpha*=0.5
+         
+    #if it fails to converge, we don't update it    
+    x.from_numpy(x_backup)
+    return 0.0
+        
+def newton_step(h):
+    compute_grad_and_energy(h)
+    g0_flat=grad.to_numpy().reshape(2*n)
+    H=build_hessian(h)
+    g=build_gradient()
+    dir=solve_system(H,g)
+    alpha=line_search(dir,h,g0_flat)
+    if(alpha==0.0):
+        print("Line search fails")
+        return            
+    apply_dir(alpha*dir)  
+        
+            
+        
+
 
 @ti.kernel
 def perturb():
     x[0] += ti.Vector([0.0, -0.2])
 
-gui = ti.GUI("Mass Spring Grid", res=(600, 600))
+h = 0.01
+gui = ti.GUI("Implicit Mass Spring Grid", res=(600, 600))
+
 init_nodes()
 init_edge()
 init_physics()
-perturb()
+#perturb()
+
 while gui.running:
+
     
-    compute_force()
-    explicit_step(0.005)
+    x_old = x.to_numpy()
+    x_tilde_val(h)
+
+    for _ in range(5):
+        newton_step(h)
+
+    # update velocity
+    x_new = x.to_numpy()
+    v.from_numpy((x_new - x_old) / h)
+
+    #rendering
     gui.clear(0x112F41)
-    pos = x.to_numpy() + 0.5          # [-0.5,0.5] -> [0,1]
+
+    pos = x_new + 0.5
     e_np = edges.to_numpy()
-    # 画弹簧
+
     for e in range(E):
         i = e_np[e][0]
         j = e_np[e][1]
         gui.line(pos[i], pos[j], radius=1, color=0xFFFFFF)
-    # 画点
+
     gui.circles(pos, radius=3, color=0x66CCFF)
+
     gui.show()
 
 
