@@ -1,13 +1,13 @@
 import taichi as ti
 import numpy as np
-
-
 ti.init(arch=ti.cpu)
 
-side_length=1.0
+side_length=0.8
 n_seg=10
 step=side_length/n_seg
 n=(n_seg+1)**2 #121 points in total
+damping=0.995
+stifness=500.0
 
 x=ti.Vector.field(2,ti.f32,shape=n)
 v=ti.Vector.field(2,ti.f32,shape=n)
@@ -24,15 +24,14 @@ f=ti.Vector.field(2,ti.f32,shape=n)
 k=ti.field(ti.f32,shape=E)
 
 is_dbc=ti.field(ti.i32,shape=n)
+x_fixed=ti.Vector.field(2,ti.f32,shape=n)
 gravity=ti.Vector([0.0,-9.8],ti.f32)
 
 x_tilde=ti.Vector.field(2,ti.f32,shape=n)
 grad=ti.Vector.field(2,ti.f32,shape=n)
 E_scalar=ti.field(ti.f32,shape=())
 
-max_triplets = 2 * n+16*E   # 先只装 inertia：每个点 2 个对角项，然后16E
-A_builder = ti.linalg.SparseMatrixBuilder(2 * n, 2 * n, max_num_triplets=max_triplets)
-
+max_triplets = 2 * n+32*E   # 先只装 inertia：每个点 2 个对角项，然后16E, DBC多加一点
 
 @ti.kernel
 def init_nodes():
@@ -43,6 +42,11 @@ def init_nodes():
             v[index]=ti.Vector([0.0,0.0])
             m[index]=1.0
             is_dbc[index]=0
+            x_fixed[index]=x[index]
+    #pin the top right and top left nodes
+    is_dbc[0*(n_seg+1)+n_seg]=1
+    is_dbc[n_seg*(n_seg+1)+n_seg]=1
+    
 
 
 @ti.kernel
@@ -74,7 +78,7 @@ def init_physics():
         j=edges[e][1]
         diff=x[i]-x[j]
         l2[e]=diff.dot(diff)
-        k[e]=500.0
+        k[e]=stifness
 
 @ti.kernel
 def clear_grad_energy():
@@ -90,7 +94,8 @@ def gravity_val():
 @ti.kernel
 def gravity_grad():
     for i in range (n):
-        grad[i]+=(-m[i])*gravity
+        if(is_dbc[i]==0):
+            grad[i]+=(-m[i])*gravity
 
 #hessian is 0
 
@@ -108,14 +113,18 @@ def inertia_val(h:ti.f32):
 @ti.kernel
 def inertia_gradient(h:ti.f32):
     for i in range (n):
-        grad[i]+=m[i]/(h*h)*(x[i]-x_tilde[i])
+        if(is_dbc[i]==0):
+            grad[i]+=m[i]/(h*h)*(x[i]-x_tilde[i])
 
 @ti.kernel
 def inertia_hessian(A: ti.types.sparse_matrix_builder(),h:ti.f32):
     for i in range (n):
         for r in ti.static(range(2)):
             dof=2*i+r
-            A[dof,dof]+=m[i]/(h*h)
+            if(is_dbc[i]==1):
+                A[dof,dof]+=1.0
+            else:
+                A[dof,dof]+=m[i]/(h*h)
 
 
 @ti.kernel
@@ -138,8 +147,10 @@ def mass_spring_grad():
         diff=x[i]-x[j]
         s=diff.dot(diff)/l2[e]-1
         g_diff=2*k[e]*s*diff
-        ti.atomic_add(grad[i], g_diff)
-        ti.atomic_add(grad[j], -g_diff)
+        if(is_dbc[i]==0):
+            ti.atomic_add(grad[i], g_diff)
+        if(is_dbc[j]==0):
+            ti.atomic_add(grad[j], -g_diff)
         
     
 @ti.kernel
@@ -166,10 +177,23 @@ def mass_spring_hess(A: ti.types.sparse_matrix_builder()):
                 dof_j_r=2*j+r
                 dof_j_c=2*j+c
                 val=H_local[r,c]
-                A[dof_i_r, dof_i_c] += val
-                A[dof_i_r, dof_j_c] += -val
-                A[dof_j_r, dof_i_c] += -val
-                A[dof_j_r, dof_j_c] += val
+                fi=(is_dbc[i]==1)
+                fj=(is_dbc[j]==1)
+                #i,i point
+                if not fi:
+                    A[dof_i_r, dof_i_c] += val
+                #i,j and j,i point
+                if(not fi) and (not fj):
+                    A[dof_i_r, dof_j_c] += -val
+                    A[dof_j_r, dof_i_c] += -val
+                #j,j point
+                if(not fj):
+                    A[dof_j_r, dof_j_c] += val
+                    
+@ti.kernel
+def velocity_damping(d:ti.f32):
+    for i in range(n):
+        v[i]*=d
                 
 #now, we build the solver                
 def build_hessian(h):
@@ -195,8 +219,12 @@ def build_gradient():
     b=np.zeros(2*n,dtype=np.float32)
     g=grad.to_numpy()
     for i in range(n):
-        b[2*i]=-g[i,0]
-        b[2*i+1]=-g[i,1]
+        if (is_dbc[i]==0):
+            b[2*i]=-g[i,0]
+            b[2*i+1]=-g[i,1]
+        else:
+            b[2*i]=0.0
+            b[2*i+1]=0.0
     return b
 
 def solve_system(A,b):
@@ -268,18 +296,19 @@ def newton_step(h):
 @ti.kernel
 def perturb():
     x[0] += ti.Vector([0.0, -0.2])
+    x[n_seg+1] += ti.Vector([0.0, -0.5])
 
+    
 h = 0.01
 gui = ti.GUI("Implicit Mass Spring Grid", res=(600, 600))
 
 init_nodes()
 init_edge()
 init_physics()
-#perturb()
+perturb()
 
 while gui.running:
 
-    
     x_old = x.to_numpy()
     x_tilde_val(h)
 
@@ -289,11 +318,13 @@ while gui.running:
     # update velocity
     x_new = x.to_numpy()
     v.from_numpy((x_new - x_old) / h)
+    velocity_damping(damping)
 
     #rendering
     gui.clear(0x112F41)
-
-    pos = x_new + 0.5
+    scale=0.7
+    offset = np.array([0.0, 0.1])
+    pos = x_new*scale + 0.5+offset
     e_np = edges.to_numpy()
 
     for e in range(E):
@@ -304,23 +335,3 @@ while gui.running:
     gui.circles(pos, radius=3, color=0x66CCFF)
 
     gui.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -5,12 +5,11 @@ ti.init(arch=ti.gpu)
 side_length=1.0
 n_seg=10
 step=side_length/n_seg
-n=(n_seg+1)**2 #有多少个点呢？你猜，是的，121个
+n=(n_seg+1)**2 
 
 x=ti.Vector.field(2,ti.f32,shape=n)
 v=ti.Vector.field(2,ti.f32,shape=n)
 f=ti.Vector.field(2,ti.f32,shape=n)
-#E是多少呢？横着n*n, 竖着n*n, 斜着n*n*2, so, n^2*4
 m=ti.field(ti.f32,shape=n) #这是一个n的array吧？
 E=n_seg*(n_seg+1)*2+2*n_seg*n_seg
 edges=ti.Vector.field(2,ti.i32,shape=E) #edges是整数,i32
@@ -52,7 +51,7 @@ def init_physics():
         j=edges[e][1]
         diff=x[i]-x[j]
         l2[e]=diff.dot(diff)
-        k[e]=100.0
+        k[e]=500.0
     for i in range(n):
         m[i]=1.0
         v[i]=ti.Vector([0.0,0.0]) #初始化
@@ -89,7 +88,7 @@ perturb()
 while gui.running:
     
     compute_force()
-    explicit_step(0.001)
+    explicit_step(0.005)
     gui.clear(0x112F41)
     pos = x.to_numpy() + 0.5          # [-0.5,0.5] -> [0,1]
     e_np = edges.to_numpy()
