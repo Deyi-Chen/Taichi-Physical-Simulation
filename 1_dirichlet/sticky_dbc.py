@@ -5,7 +5,7 @@ ti.init(arch=ti.cpu)
 side_length=0.8
 n_seg=10
 step=side_length/n_seg
-n=(n_seg+1)**2 #121 points in total
+n=(n_seg+1)**2 
 damping=0.995
 stifness=500.0
 
@@ -18,8 +18,8 @@ V=H
 D=2*n_seg*n_seg
 E=H+V+D
 
-edges=ti.Vector.field(2,ti.i32,shape=E) #edges是整数,i32
-l2=ti.field(ti.f32,shape=E)#对于每一个弹簧，都有stifness 
+edges=ti.Vector.field(2,ti.i32,shape=E)
+l2=ti.field(ti.f32,shape=E)
 f=ti.Vector.field(2,ti.f32,shape=n)
 k=ti.field(ti.f32,shape=E)
 
@@ -31,7 +31,7 @@ x_tilde=ti.Vector.field(2,ti.f32,shape=n)
 grad=ti.Vector.field(2,ti.f32,shape=n)
 E_scalar=ti.field(ti.f32,shape=())
 
-max_triplets = 2 * n+32*E   # 先只装 inertia：每个点 2 个对角项，然后16E, DBC多加一点
+max_triplets = 2 * n+32*E   #we just add more DOF here in case it run out of space
 
 @ti.kernel
 def init_nodes():
@@ -65,7 +65,7 @@ def init_edge():
     #diagonals
     for i in range (n_seg):
         for j in range (n_seg):
-            cell_id=i*n_seg+j #一共有n_seg**2个格子，每个格子要写两条边.所以*2
+            cell_id=i*n_seg+j 
             id0=base+cell_id*2 
             id1=base+cell_id*2+1     
             edges[id0]=[i*(n_seg+1)+j,(i+1)*(n_seg+1)+j+1]
