@@ -75,9 +75,9 @@ def compute_force():
 @ti.kernel
 def explicit_step(h:ti.f32):
     for i in range(n):
+        x[i]+=h*v[i]
         v[i]+=h*f[i]/m[i]
         v[i]*=0.999 #damping
-        x[i]+=h*v[i]
 
 @ti.kernel
 def perturb():
