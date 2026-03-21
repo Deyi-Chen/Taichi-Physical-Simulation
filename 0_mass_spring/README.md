@@ -3,11 +3,9 @@
 We apply the same initial perturbation to both explicit and implicit case, and explicit euler becomes unstable and diverges quickly. The system energy increases artificially, leading to numerical explosion (gray screen). On the other hand, implicit euler remains stable and produces physically plausible results.
 
 
-### Explicit Euler Demo(unstable)
-<video src="explicit_mass_spring.mp4" controls width="400"></video>
-
-### Implicit Euler Demo (stable)
-<video src="implicit_mass_spring.mp4" controls width="400"></video>
+| Explicit (diverges) | Implicit (stable) |
+|--------------------|------------------|
+| ![](explicit.gif)  | ![](implicit.gif) |
 
 ## Explicit time integration
 
