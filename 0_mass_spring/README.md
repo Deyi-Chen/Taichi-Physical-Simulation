@@ -1,3 +1,14 @@
+## Stability comparison under same perturbation
+
+We apply the same initial perturbation to both explicit and implicit case, and explicit euler becomes unstable and diverges quickly. The system energy increases artificially, leading to numerical explosion (gray screen). On the other hand, implicit euler remains stable and produces physically plausible results.
+
+
+### Explicit Euler Demo(unstable)
+<video src="explicit_mass_spring.mp4" controls width="400"></video>
+
+### Implicit Euler Demo (stable)
+<video src="implicit_mass_spring.mp4" controls width="400"></video>
+
 ## Explicit time integration
 
 ```math
@@ -34,7 +45,7 @@ x^{i+1} = x^i - (g'(x^i))^{-1} g(x^i)
 ```
 
 ## Optimization lens 
-Observe the formula $M\left(x^{n+1} - (x^n + \Delta t\, v^n)\right)-\Delta t^2 f^{n+1}=0$. Let $x^{n+1} = x$ and define $ \tilde{x}^n = x^n + \Delta t\, v^n$, then the equation becomes
+Observe the formula $M\left(x^{n+1} - (x^n + \Delta t\, v^n)\right)-\Delta t^2 f^{n+1}=0$. Let $x^{n+1} = x$ and define $\tilde{x}^n = x^n + \Delta t\, v^n$, then the equation becomes
 $M(x - \tilde{x}^n) - \Delta t^2 f(x) = 0$ 
 
 Since $M$ is a symmetric matrix, we know that 
