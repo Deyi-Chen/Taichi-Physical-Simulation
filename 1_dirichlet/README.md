@@ -1,4 +1,7 @@
+## Demo
+![](sticky_dirichlet.gif)
 ## Sticky Dirichlet Boundary Condition
+
 
 In the previous section, we showed how the implicit mass–spring system can be formulated as an optimization problem. Here we consider the case where certain degrees of freedom are fixed, for example when part of a cloth is attached to a wall.
 
