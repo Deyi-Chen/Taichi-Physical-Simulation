@@ -82,7 +82,6 @@ $$
 p = -H^{-1} g
 $$
 
----
 
 ### Step 2: Compute maximum feasible step size (CCD)
 
@@ -90,7 +89,6 @@ $$
 \alpha_c = \min_{j,k} \alpha_{jk}^C
 $$
 
----
 
 ### Step 3: Initialize step size
 
@@ -98,7 +96,6 @@ $$
 \alpha = \eta \alpha_c \quad (\eta \approx 0.9)
 $$
 
----
 
 ### Step 4: Filtered line search
 
@@ -108,7 +105,6 @@ $$
 \quad \alpha \leftarrow \frac{\alpha}{2}
 $$
 
----
 
 ### Step 5: Update
 
