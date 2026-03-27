@@ -5,6 +5,7 @@
 
 ### Energy
 In simulation, we may want to fix some points, namely 
+
 ```math
 \min_x \; E(x) = \frac{1}{2} \left\| x - (x^n + h v^n) \right\|_M^2 + h^2 P(x)
 \quad \text{s.t.} \quad Ax = b \quad \text{and} \quad \forall k,\; d_k(x) \ge 0
@@ -17,12 +18,9 @@ P_b(x) = \sum_{i,j} w_i \, b(d_{ij}(x))
 $$
 
 $$
-b(d_{ij}(x)) =
-\begin{cases}
-\frac{\kappa}{2} \left( \frac{d_{ij}}{\hat{d}} - 1 \right) \ln \frac{d_{ij}}{\hat{d}}, & d_{ij} < \hat{d} \\
-0, & d_{ij} \ge \hat{d}
-\end{cases}
+b(d_{ij}(x)) = \begin{cases} \dfrac{\kappa}{2} \left( \dfrac{d_{ij}}{\hat{d}} - 1 \right) \ln \dfrac{d_{ij}}{\hat{d}} & \text{if } d_{ij} < \hat{d} \\ 0 & \text{if } d_{ij} \geq \hat{d} \end{cases}
 $$
+
 As $d \to 0^+$, the barrier energy grows to infinity, 
 preventing the solver from allowing interpenetration.
 
