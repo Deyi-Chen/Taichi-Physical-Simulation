@@ -9,3 +9,6 @@ Particularly, in the case of high friction, motion quickly damps out and reaches
 |-----------------------------|-----------------------------|
 | ![](miu_0.3_friction.gif)   | ![](miu_0.01_friction.gif)  |
 
+## Notes
+
+[Dry Friction: Formulation and Derivatives](./Dry_Friction.pdf)
