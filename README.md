@@ -2,31 +2,48 @@
 
 A personal gallery of physics simulations implemented in Taichi.
 
-This repository documents my journey building physical simulation systems from scratch — starting with simple mass-spring models and moving toward more advanced methods.
+This repository documents my process of building physical simulation systems from scratch. It starts from simple models like mass-spring systems, and gradually explores more advanced topics such as constraints, contact, and friction.
 
-More coming soon.
+Each module is designed to be small, self-contained, and visualized with demos.
 
----
+## 🎬 Demo
+<p align="center">
+  <img src="4_moving_dirichlet/moving_dirichlet.gif" width="300"/>
+  <img src="3_friction/miu_0.01_friction.gif" width="300"/>
+</p>
 
-## Implementations
+<p align="center">
+  <em>Moving Dirichlet (left) vs Low Friction μ=0.01 (right)</em>
+</p>
 
-### 1. Explicit Mass-Spring System
+## 📂 Structure
 
-- Grid generation
-- Structural + shear springs
-- Explicit (semi-implicit) Euler integration
-- Basic damping
-- GPU accelerated (Taichi)
+- `0_mass_spring/`  
+  Explicit vs implicit integration and stability comparison
 
----
+- `1_dirichlet/`  
+  Dirichlet boundary conditions (sticky constraints)
 
-## Roadmap
+- `2_contact/`  
+  Contact handling using barrier methods
 
-- Gravity + fixed boundary cloth
-- Implicit Euler (Newton solver)
-- Conjugate Gradient solver
-- FEM
-- MPM
-- Rigid body dynamics
+- `3_friction/`  
+  Friction behavior under different coefficients
 
-Stay tuned.
+- `4_moving_dirichlet/`  
+  Moving boundary constraints with soft penalty formulation
+
+- `implementation_notes/`  
+  Implementation documents for code designing
+
+
+## 🚀 Future Work
+
+- Continuum mechanics (strain / stress, FEM)
+- SPH (Smoothed Particle Hydrodynamics)
+- MPM (Material Point Method)
+- More advanced solvers and optimization methods
+
+## 📝 Notes
+
+This is an ongoing project. Some parts are experimental and may change over time.
